@@ -1,0 +1,82 @@
+local Hitboxes = {}
+
+type ChildInstances = { [number] : Instance }
+type BasicHitboxParams = {
+	FilterChildInstances : ChildInstances;
+	FilterType : Enum.RaycastFilterType;
+	Size : Vector3;
+	Offset : CFrame;
+}
+
+Hitboxes.BasicHitboxParams = function(FilterChildInstances : ChildInstances, FilterType : Enum.RaycastFilterType, Size : Vector3, Offset : CFrame)
+	local HitboxParams : BasicHitboxParams = {
+		["FilterChildInstances"] = FilterChildInstances;
+		["FilterType"] = FilterType;
+		["Size"] = Size;
+		["Offset"] = Offset;
+	}
+	
+	return HitboxParams
+end
+
+function Hitboxes:BasicHitboxStart(OnCharacterHit, Duration : number, BasicHitboxParams : BasicHitboxParams, BaseObject : BasePart, CallbackParams : { [any] : any })
+	local HitboxPart = Instance.new("Part")
+	HitboxPart.CanCollide = false
+	--HitboxPart.Transparency = 1 Disabled for testing
+	HitboxPart.Massless = true
+	HitboxPart.Size = BasicHitboxParams.Size
+	HitboxPart.Name = "HitboxPart"
+	
+	local HitboxPartClone = HitboxPart:Clone() --For testing
+	HitboxPartClone.Color = Color3.fromRGB(255, 0, 0)
+	HitboxPartClone.Material = Enum.Material.ForceField
+	HitboxPartClone.Name = "HitboxPartClone"
+	HitboxPartClone.Parent = workspace.Temp
+	
+	HitboxPart.Parent = workspace.Temp
+	
+	local HitboxConstraint = Instance.new("WeldConstraint")
+	HitboxConstraint.Name = "HitboxConstraint"
+	HitboxConstraint.Parent = HitboxPart
+	HitboxConstraint.Part0 = HitboxPart
+	
+	HitboxPart.CFrame = BaseObject.CFrame * BasicHitboxParams.Offset
+	HitboxConstraint.Part1 = BaseObject
+	
+	local HitboxConstraintClone = Instance.new("WeldConstraint")
+	HitboxConstraintClone.Name = "HitboxConstraintClone"
+	HitboxConstraintClone.Parent = HitboxPartClone
+	HitboxConstraintClone.Part0 = HitboxPartClone
+	
+	HitboxPartClone.CFrame = BaseObject.CFrame * BasicHitboxParams.Offset
+	HitboxConstraintClone.Part1 = BaseObject
+	
+	local AlreadyHit = {}
+	
+	HitboxPart.Touched:Connect(function(Hit : BasePart)
+		if Hit == BaseObject or BaseObject.Parent == Hit.Parent then return end
+		
+		if Hit.Parent:FindFirstChild("Humanoid") then
+			local Character : Model = Hit.Parent
+			
+			if not Character:IsA("Model") then return end
+			if table.find(AlreadyHit, Character) then return end
+			
+			if BasicHitboxParams.FilterType == Enum.RaycastFilterType.Exclude then
+				if BasicHitboxParams.FilterChildInstances[Character] then return end
+			elseif BasicHitboxParams.FilterType == Enum.RaycastFilterType.Include then
+				if not BasicHitboxParams.FilterInstances[Character] then return end
+			end
+			
+			table.insert(AlreadyHit, Character)
+			OnCharacterHit(Character, table.unpack(CallbackParams))
+			print("Hit "..Character.Name)
+		end
+		
+	end)
+	
+	game.Debris:AddItem(HitboxPart, Duration)
+	game.Debris:AddItem(HitboxPartClone, 0.3)
+end
+
+return Hitboxes
