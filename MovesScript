@@ -1,0 +1,171 @@
+local Hitboxes = require(game.ServerStorage.Hitboxes)
+local TweenService = game:GetService("TweenService")
+local StateChanges = require(game.ServerStorage.StateChanges)
+local Forces = require(game.ServerStorage.Forces)
+
+local function HitHighlight(Character : Model, Duration : number?)
+	local HitHighlight = Instance.new("Highlight")
+	HitHighlight.Parent = Character
+	HitHighlight.FillColor = Color3.fromRGB(255, 255, 255)
+	HitHighlight.FillTransparency = 0.25
+
+	local HitHighlightTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Linear)
+
+	TweenService:Create(HitHighlight, HitHighlightTweenInfo, {FillTransparency = 1, OutlineTransparency = 1}):Play()
+	game.Debris:AddItem(HitHighlight, Duration or 0.3)
+end
+
+local function StunHighlight(Character : Model, Duration : number?)
+	local HitHighlight = Instance.new("Highlight")
+	HitHighlight.Parent = Character
+	HitHighlight.FillColor = Color3.fromRGB(255, 255, 0)
+	HitHighlight.OutlineColor = Color3.fromRGB(255, 255, 0)
+	HitHighlight.FillTransparency = 0.1
+
+	local HitHighlightTweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear)
+
+	TweenService:Create(HitHighlight, HitHighlightTweenInfo, {FillTransparency = 1, OutlineTransparency = 1}):Play()
+	game.Debris:AddItem(HitHighlight, Duration or 1)
+end
+
+local OnLightM1Hit = function(EnemyCharacter, OriginalCharacter)
+	if not EnemyCharacter.States.Blocking.Value then
+		EnemyCharacter.Humanoid.Health -= 5
+
+		if game.Players:GetPlayerFromCharacter(EnemyCharacter) then
+			local Player = game.Players:GetPlayerFromCharacter(EnemyCharacter)
+
+			StateChanges:StunPlayer(Player, 0.6)
+		end
+
+		Forces:Knockback(OriginalCharacter.HumanoidRootPart, EnemyCharacter.HumanoidRootPart, 10)
+
+		HitHighlight(EnemyCharacter)
+	else
+		if game.Players:GetPlayerFromCharacter(OriginalCharacter) then
+			EnemyCharacter.States.LastHit.Value = game.Players:GetPlayerFromCharacter(OriginalCharacter).UserId
+		end
+		
+		StateChanges:StunPlayer(game.Players:GetPlayerFromCharacter(OriginalCharacter), 1)
+		
+		StunHighlight(OriginalCharacter)
+	end
+end
+
+local OnHeavyM1Hit = function(EnemyCharacter, OriginalCharacter)
+	if not EnemyCharacter.States.Blocking.Value then
+		EnemyCharacter.Humanoid.Health -= 10
+
+		if game.Players:GetPlayerFromCharacter(EnemyCharacter) then
+			local Player = game.Players:GetPlayerFromCharacter(EnemyCharacter)
+
+			StateChanges:StunPlayer(Player, 1.25)
+		end
+		if game.Players:GetPlayerFromCharacter(OriginalCharacter) then
+			EnemyCharacter.States.LastHit.Value = game.Players:GetPlayerFromCharacter(OriginalCharacter).UserId
+		end
+
+		Forces:Knockback(OriginalCharacter.HumanoidRootPart, EnemyCharacter.HumanoidRootPart, 25)
+
+		HitHighlight(EnemyCharacter)
+	else
+		
+		StateChanges:StunPlayer(game.Players:GetPlayerFromCharacter(OriginalCharacter), 1)
+		
+		StunHighlight(OriginalCharacter)
+	end
+end
+
+local OnM2Hit = function(EnemyCharacter, OriginalCharacter)
+	if EnemyCharacter.States.Blocking.Value == false then
+		EnemyCharacter.Humanoid.Health -= 50
+
+		if game.Players:GetPlayerFromCharacter(EnemyCharacter) then
+			local Player = game.Players:GetPlayerFromCharacter(EnemyCharacter)
+
+			StateChanges:StunPlayer(Player, 1.25)
+		end
+		if game.Players:GetPlayerFromCharacter(OriginalCharacter) then
+			EnemyCharacter.States.LastHit.Value = game.Players:GetPlayerFromCharacter(OriginalCharacter).UserId
+		end
+
+		Forces:Knockback(OriginalCharacter.HumanoidRootPart, EnemyCharacter.HumanoidRootPart, 25)
+
+		HitHighlight(EnemyCharacter, 0.5)
+	else	
+		StateChanges:StopBlock(EnemyCharacter)
+		EnemyCharacter.States.CanBlock.Value = false
+
+		StunHighlight(EnemyCharacter)
+		
+		task.wait(3)
+		
+		EnemyCharacter.States.CanBlock.Value = true
+	end
+end
+
+local HitboxSize = Vector3.new(5, 5, 5)
+local HitboxOffset = CFrame.new(Vector3.new(0, 0, -7.5))
+local HitboxFilterType = Enum.RaycastFilterType.Exclude
+
+game.ReplicatedStorage.M1.OnServerEvent:Connect(function(Player)
+	if Player.States.MeleeCooldown.Value or Player.States.Stunned.Value or Player.States.CanMelee.Value == false or Player.Character.States.Blocking.Value or not (Player.States.Energy.Value >= 10) then return end
+	Player.States.MeleeCooldown.Value = true
+	local Character = Player.Character
+	local HitboxParams = Hitboxes.BasicHitboxParams({Character}, HitboxFilterType, HitboxSize, HitboxOffset)
+	Player.States.Energy.Value -= 10
+
+	if Player.States.M1.Value <= 4 then
+		
+		local M1Animation = game.ServerStorage.Animations.M1[Player.States.M1.Value]
+		Player.Character.Humanoid.Animator:LoadAnimation(M1Animation):Play()
+		
+		Hitboxes:BasicHitboxStart(OnLightM1Hit, 0.01, HitboxParams, Character.HumanoidRootPart, {Character})
+		StateChanges:SlowPlayer(Player, 0.35)
+		StateChanges:StartM1Reset(Player)
+		
+		Player.States.M1.Value += 1
+		task.wait(0.45)
+	elseif Player.States.M1.Value == 5 then
+		
+		local M1Animation = game.ServerStorage.Animations.M1[5]
+		Player.Character.Humanoid.Animator:LoadAnimation(M1Animation):Play()
+		
+		Hitboxes:BasicHitboxStart(OnHeavyM1Hit, 0.01, HitboxParams, Character.HumanoidRootPart, {Character})
+		StateChanges:SlowPlayer(Player, 0.55)
+		
+		Player.States.M1.Value = 1
+		task.wait(1)
+	end
+	
+	Player.States.MeleeCooldown.Value = false
+end)
+
+game.ReplicatedStorage.M2.OnServerEvent:Connect(function(Player)
+	if Player.States.MeleeCooldown.Value or Player.States.Stunned.Value or Player.States.CanMelee.Value == false or Player.Character.States.Blocking.Value or not (Player.States.Energy.Value >= 20) then return end
+	print("Received event from server ("..Player:GetNetworkPing().."ms)")
+	Player.States.MeleeCooldown.Value = true
+	local Character = Player.Character
+	local HitboxParams = Hitboxes.BasicHitboxParams({Character}, HitboxFilterType, HitboxSize, HitboxOffset)
+	Player.States.Energy.Value -= 20
+	
+	local M2Animation = game.ServerStorage.Animations.M2
+	Player.Character.Humanoid.Animator:LoadAnimation(M2Animation):Play()
+
+	Hitboxes:BasicHitboxStart(OnM2Hit, 0.01, HitboxParams, Character.HumanoidRootPart, {Character})
+	StateChanges:SlowPlayer(Player, 0.7)
+
+	Player.States.M1.Value = 1
+	task.wait(1.75)
+	Player.States.MeleeCooldown.Value = false
+end)
+
+game.ReplicatedStorage.Blocking.OnServerEvent:Connect(function(Player, Blocking)
+	if Blocking then
+		if not Player.States.MeleeCooldown.Value and not Player.States.Stunned.Value then
+			StateChanges:StartBlock(Player.Character)
+		end
+	else
+		StateChanges:StopBlock(Player.Character)
+	end
+end)
