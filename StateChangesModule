@@ -1,0 +1,66 @@
+local StateChanges = {}
+
+local TweenService = game:GetService("TweenService")
+
+function StateChanges:StunPlayer(Player : Player, Duration : number)
+	if Player.States.Stunned.Value == false and Player.States.Stunnable.Value == true then
+		Player.States.Stunned.Value = true
+	end
+	
+	if Player.Durations.Stun.Value < Duration then
+		Player.Durations.Stun.Value = Duration
+		
+		TweenService:Create(Player.Durations.Stun, TweenInfo.new(Duration, Enum.EasingStyle.Linear), {Value = 0}):Play()
+	end
+end
+
+function StateChanges:SlowPlayer(Player : Player, Duration : number)
+	if Player.States.Slowed.Value == false and Player.States.Slowable.Value == true then
+		Player.States.Slowed.Value = true
+	end
+	
+	if Player.Durations.Slow.Value < Duration then
+		Player.Durations.Slow.Value = Duration
+		
+		TweenService:Create(Player.Durations.Slow, TweenInfo.new(Duration, Enum.EasingStyle.Linear), {Value = 0}):Play()
+	end
+end
+
+function StateChanges:StartM1Reset(Player : Player)
+	if Player.Durations.M1Reset.Value < 1.5 then
+		Player.Durations.M1Reset.Value = 1.5
+		
+		TweenService:Create(Player.Durations.M1Reset, TweenInfo.new(1.5, Enum.EasingStyle.Linear), {Value = 0}):Play()
+	end
+end
+
+function StateChanges:UnStun(Player)
+	TweenService:Create(Player.States.Stun):Cancel()
+	Player.States.Stun.Value = false
+end
+
+function StateChanges:Unslow(Player)
+	TweenService:Create(Player.States.Slow):Cancel()
+	Player.States.Slow.Value = false
+end
+
+function StateChanges:StartBlock(Character)
+	if Character.States.CanBlock.Value then
+		Character.States.Blocking.Value = true
+	
+		local BlockAnimation = game.ServerStorage.Animations.Block
+		Character.Humanoid.Animator:LoadAnimation(BlockAnimation):Play()
+	end
+end
+
+function StateChanges:StopBlock(Character)
+	Character.States.Blocking.Value = false
+
+	for _, Track in Character.Humanoid.Animator:GetPlayingAnimationTracks() do
+		if Track.Animation == game.ServerStorage.Animations.Block then
+			Track:Stop()
+		end
+	end
+end
+
+return StateChanges
